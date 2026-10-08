@@ -1,0 +1,898 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Werkplek</title>
+<meta name="description" content="Reserveer per uur werkplek A, werkplek B of een plek in de kantine.">
+<meta name="theme-color" content="#efeff1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0d0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💻</text></svg>">
+<style>
+/* Hetzelfde monochrome kaartontwerp als Gymtracker. Alle kleur zit in tokens;
+   licht en donker zijn dezelfde vormen met omgekeerde grijstinten. */
+:root {
+  --bg: #efeff1;
+  --kaart: #ffffff;
+  --verhoogd: #f7f7f8;
+  --rand: #e3e4e7;
+  --rand-sterk: #d2d4d8;
+  --tekst: #15171a;
+  --zacht: #6c7079;
+  --zachter: #9a9ea6;
+  --omgekeerd: #ffffff;
+  --sterk: #15171a;
+  --radius: 14px;
+  --radius-klein: 9px;
+  --schaduw: 0 1px 2px rgba(0, 0, 0, .05), 0 1px 3px rgba(0, 0, 0, .04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-thema="licht"]) {
+    --bg: #0c0d0f; --kaart: #17191c; --verhoogd: #202329;
+    --rand: #282c32; --rand-sterk: #363b43;
+    --tekst: #f3f4f6; --zacht: #9aa0aa; --zachter: #6b7079;
+    --omgekeerd: #15171a; --sterk: #f3f4f6; --schaduw: none;
+  }
+}
+:root[data-thema="donker"] {
+  --bg: #0c0d0f; --kaart: #17191c; --verhoogd: #202329;
+  --rand: #282c32; --rand-sterk: #363b43;
+  --tekst: #f3f4f6; --zacht: #9aa0aa; --zachter: #6b7079;
+  --omgekeerd: #15171a; --sterk: #f3f4f6; --schaduw: none;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--bg); color: var(--tekst);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+}
+h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: -.015em; }
+h1 { font-size: 1.5rem; font-weight: 700; }
+h2 { font-size: 1.125rem; font-weight: 650; }
+h3 { font-size: .8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--zacht); }
+p { margin: .3rem 0 0; }
+.sub { color: var(--zacht); font-size: .8125rem; }
+a { color: var(--tekst); }
+main { max-width: 640px; margin: 0 auto; padding: 0 .875rem; }
+:focus-visible { outline: 2px solid var(--tekst); outline-offset: 2px; }
+
+/* ---------- kopbalk ---------- */
+.balk { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--rand); }
+.balk-binnen { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: .75rem; padding: .6rem .875rem; }
+.balk .titel { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.balk .titel strong { font-size: 1.0625rem; font-weight: 700; letter-spacing: -.01em; }
+.balk .titel .sub { font-size: .75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.balk .rechts { margin-left: auto; display: flex; gap: .4rem; align-items: center; flex: 0 0 auto; }
+
+.icoon {
+  width: 2.25rem; height: 2.25rem; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid var(--rand);
+  background: var(--kaart); color: var(--tekst);
+  font-size: 1rem; cursor: pointer; padding: 0; box-shadow: var(--schaduw);
+}
+.icoon:hover { border-color: var(--rand-sterk); }
+.icoon.stil { border-color: transparent; background: transparent; box-shadow: none; color: var(--zacht); font-size: 1.35rem; }
+.icoon.stil:hover { color: var(--tekst); background: var(--verhoogd); }
+
+/* ---------- kaarten ---------- */
+.kaart {
+  background: var(--kaart); border: 1px solid var(--rand);
+  border-radius: var(--radius); box-shadow: var(--schaduw);
+  margin: .75rem 0; overflow: hidden;
+}
+/* clip in plaats van hidden: dan blijft de plekkenkop sticky binnen de kaart. */
+.kaart.clip { overflow: clip; }
+.kaart-kop { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: .875rem 1rem .75rem; }
+.kaart-body { padding: .875rem 1rem; }
+
+/* ---------- knoppen ---------- */
+.knop {
+  padding: .7rem 1rem; border-radius: var(--radius-klein);
+  border: 1px solid var(--rand-sterk); background: var(--kaart);
+  color: var(--tekst); font: inherit; font-weight: 600; cursor: pointer;
+}
+.knop:hover { background: var(--verhoogd); }
+.knop.primair {
+  width: 100%; background: var(--sterk); border-color: var(--sterk);
+  color: var(--omgekeerd); padding: .85rem 1rem; font-size: 1rem;
+}
+.knop.primair:hover { opacity: .9; background: var(--sterk); }
+.knop.klein { padding: .35rem .75rem; font-size: .8125rem; border-radius: 999px; white-space: nowrap; }
+.knop-paar { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: 1.1rem; }
+.knop-paar .knop.primair { padding: .7rem 1rem; }
+
+/* ---------- weekdagen kiezen: bolletjes ---------- */
+.weekdagen { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .35rem; margin-top: .4rem; }
+.weekdagen button {
+  aspect-ratio: 1; width: 100%; max-width: 2.75rem; justify-self: center;
+  border-radius: 50%; border: 1px solid var(--rand-sterk);
+  background: var(--kaart); color: var(--tekst);
+  font: inherit; font-size: .8125rem; font-weight: 650; cursor: pointer; padding: 0;
+}
+.weekdagen button:hover { background: var(--verhoogd); }
+.weekdagen button[aria-pressed="true"] { background: var(--sterk); border-color: var(--sterk); color: var(--omgekeerd); }
+#p-samen { margin-top: .6rem; }
+
+/* ---------- formulieren ---------- */
+label { display: block; font-size: .8125rem; color: var(--zacht); margin: .7rem 0 0; }
+input, select {
+  width: 100%; margin-top: .3rem; padding: .6rem .7rem;
+  background: var(--verhoogd); color: var(--tekst);
+  border: 1px solid var(--rand); border-radius: var(--radius-klein);
+  font: inherit; font-size: 1rem;
+}
+select { font-weight: 600; }
+.formulier { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+
+/* ---------- aanmelden ---------- */
+.aanmelden { display: grid; place-items: center; min-height: 100dvh; padding: 1rem; }
+.aanmelden .kaart { width: min(400px, 100%); }
+
+/* ---------- week en dagkeuze ---------- */
+.weeknav { display: flex; align-items: center; gap: .25rem; padding: .5rem .6rem 0; }
+#weekbereik { flex: 1; text-align: center; font-weight: 650; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+.dagen { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .3rem; padding: .5rem .6rem .75rem; }
+.dagen button {
+  display: flex; flex-direction: column; align-items: center; gap: .1rem; min-width: 0;
+  padding: .45rem 0 .4rem; border-radius: var(--radius-klein);
+  border: 1px solid var(--rand); background: var(--kaart); color: var(--tekst);
+  font: inherit; cursor: pointer;
+}
+.dagen button:hover { background: var(--verhoogd); }
+.dagen .dagnaam { font-size: .6875rem; font-weight: 600; color: var(--zacht); text-transform: uppercase; letter-spacing: .04em; }
+.dagen strong { font-size: 1.0625rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.dagen .stip { width: .35rem; height: .35rem; border-radius: 50%; }
+.dagen .stip.aan { background: var(--sterk); }
+.dagen button.vandaag { border-color: var(--rand-sterk); }
+.dagen button.vandaag strong { text-decoration: underline 2px; text-underline-offset: 3px; }
+.dagen button.verleden { opacity: .5; }
+.dagen button.actief { background: var(--sterk); border-color: var(--sterk); color: var(--omgekeerd); opacity: 1; }
+.dagen button.actief .dagnaam { color: inherit; opacity: .7; }
+.dagen button.actief .stip.aan { background: var(--omgekeerd); }
+
+/* ---------- uurrooster ---------- */
+.rooster { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.45fr); }
+.rooster .kop {
+  position: sticky; top: var(--balk-h, 3.5rem); z-index: 2;
+  background: var(--kaart); padding: .5rem .3rem; text-align: center;
+  border-top: 1px solid var(--rand); border-left: 1px solid var(--rand);
+}
+.rooster .kop.hoek { border-left: 0; }
+.rooster .kop strong { display: block; font-size: .9375rem; font-weight: 650; line-height: 1.25; }
+.rooster .kop span { display: block; font-size: .6875rem; font-weight: 600; color: var(--zachter); }
+.tijd {
+  padding: .45rem .4rem 0 .9rem; border-top: 1px solid var(--rand);
+  font-size: .8125rem; color: var(--zacht); font-variant-numeric: tabular-nums;
+}
+.tijd.nu { color: var(--tekst); font-weight: 700; position: relative; }
+.tijd.nu::before {
+  content: ''; position: absolute; left: .35rem; top: .85rem;
+  width: .35rem; height: .35rem; border-radius: 50%; background: var(--tekst);
+}
+.cel {
+  min-height: 3.1rem; width: 100%; margin: 0; padding: .35rem;
+  display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: .25rem;
+  border: 0; border-top: 1px solid var(--rand); border-left: 1px solid var(--rand); border-radius: 0;
+  background: transparent; color: var(--tekst); font: inherit; cursor: pointer;
+}
+.cel:hover:not(:disabled):not(.bezet) { background: var(--verhoogd); }
+.cel .plus { color: var(--zachter); font-size: 1.15rem; line-height: 1; font-weight: 300; }
+.cel.bezet { cursor: default; background: var(--verhoogd); }
+.cel:disabled { cursor: default; }
+.cel:disabled > * { opacity: .45; }
+.tijd.voorbij { color: var(--zachter); }
+.naam {
+  display: inline-block; max-width: 100%;
+  padding: .2rem .55rem; border-radius: 999px;
+  font-size: .8125rem; font-weight: 600; line-height: 1.35;
+  background: var(--kaart); border: 1px solid var(--rand-sterk); color: var(--tekst);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.naam.ik { background: var(--sterk); border-color: var(--sterk); color: var(--omgekeerd); }
+.naam.meer { background: transparent; border-style: dashed; color: var(--zacht); }
+
+/* ---------- jouw reserveringen ---------- */
+.mijnlijst { list-style: none; margin: 0; padding: 0; }
+.mijnlijst li { display: flex; align-items: center; border-top: 1px solid var(--rand); }
+.mijnlijst .ga {
+  flex: 1; min-width: 0; display: flex; gap: .75rem; align-items: baseline;
+  padding: .75rem 1rem; border: 0; background: transparent; color: var(--tekst);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.mijnlijst .ga:hover { background: var(--verhoogd); }
+.mijnlijst .datum { color: var(--zacht); font-size: .875rem; min-width: 5.5rem; font-variant-numeric: tabular-nums; }
+.mijnlijst .wat { font-variant-numeric: tabular-nums; }
+.mijnlijst .wat strong { font-weight: 650; margin-right: .4rem; }
+.rij-weg {
+  border: 0; background: transparent; color: var(--zachter);
+  font-size: 1.25rem; line-height: 1; cursor: pointer; padding: .6rem 1rem;
+}
+.rij-weg:hover { color: var(--tekst); }
+.leeg { padding: 0 1rem 1rem; }
+
+/* ---------- vensters ---------- */
+dialog {
+  border: 0; padding: 0; background: transparent; color: var(--tekst);
+  width: min(440px, calc(100% - 1.5rem)); max-height: calc(100dvh - 2rem);
+}
+dialog::backdrop { background: rgba(0, 0, 0, .45); }
+dialog .kaart { margin: 0; overflow: auto; max-height: calc(100dvh - 2rem); }
+.linkrij { display: flex; gap: .5rem; margin-top: .9rem; }
+.linkveld {
+  flex: 1; min-width: 0; padding: .6rem .7rem;
+  background: var(--verhoogd); border: 1px solid var(--rand); border-radius: var(--radius-klein);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .75rem;
+  color: var(--zacht); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.uitleg { border-top: 1px solid var(--rand); }
+.uitleg summary {
+  padding: .8rem 1rem; cursor: pointer; list-style: none; font-weight: 650; font-size: .9375rem;
+  display: flex; justify-content: space-between;
+}
+.uitleg summary::-webkit-details-marker { display: none; }
+.uitleg summary::after { content: '+'; color: var(--zachter); font-weight: 400; }
+.uitleg[open] summary::after { content: '–'; }
+.uitleg ol { margin: 0; padding: 0 1rem .9rem 2.2rem; font-size: .875rem; line-height: 1.7; }
+.uitleg .sub { padding: 0 1rem .9rem; margin: 0; }
+
+/* ---------- melding ---------- */
+.melding {
+  position: fixed; inset: auto .75rem calc(1rem + env(safe-area-inset-bottom)); z-index: 20;
+  max-width: 610px; margin: 0 auto;
+  padding: .75rem .9rem; border-radius: var(--radius-klein);
+  background: var(--sterk); color: var(--omgekeerd);
+  font-size: .875rem; font-weight: 500;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .18);
+}
+
+@media (max-width: 400px) {
+  .rooster { grid-template-columns: 2.9rem minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.35fr); }
+  .tijd { padding-left: .7rem; font-size: .75rem; }
+  .tijd.nu::before { left: .25rem; }
+  .naam { font-size: .75rem; padding: .15rem .45rem; }
+  .mijnlijst .datum { min-width: 4.75rem; }
+}
+</style>
+</head>
+<body>
+
+<div id="melding" class="melding" hidden role="status"></div>
+
+<!-- Aanmeldscherm: alleen je eigen naam; deze browser onthoudt hem. -->
+<main id="aanmelden" class="aanmelden" hidden>
+  <div class="kaart">
+    <form class="kaart-body" id="aanmeld-form">
+      <h1>Werkplek</h1>
+      <p class="sub">Reserveer per uur werkplek A, werkplek B of een plek in de kantine.</p>
+      <label>Je naam
+        <input id="gebruikersnaam" autocomplete="nickname" maxlength="30" placeholder="Schrijf hier je naam" required></label>
+      <div style="margin-top:1rem"><button class="knop primair">Beginnen</button></div>
+    </form>
+  </div>
+</main>
+
+<div id="app" hidden>
+  <header class="balk">
+    <div class="balk-binnen">
+      <div class="titel"><strong>Werkplek</strong><span class="sub" id="sync">laden…</span></div>
+      <span class="rechts">
+        <button class="knop klein" id="wissel" title="Andere naam gebruiken"></button>
+        <button class="icoon" id="agenda-knop" title="Agenda-koppeling" aria-label="Agenda-koppeling">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
+        </button>
+        <button class="icoon" id="thema-knop" title="Wissel thema" aria-label="Wissel thema">◐</button>
+      </span>
+    </div>
+  </header>
+
+  <main>
+    <div class="kaart">
+      <div class="weeknav">
+        <button class="icoon stil" id="vorige" aria-label="Vorige week">‹</button>
+        <span id="weekbereik"></span>
+        <button class="icoon stil" id="volgende" aria-label="Volgende week">›</button>
+        <button class="knop klein" id="vandaag-knop">Vandaag</button>
+      </div>
+      <div class="dagen" id="dagen"></div>
+    </div>
+
+    <div class="kaart clip">
+      <div class="kaart-kop">
+        <div><h2 id="dagtitel"></h2><p class="sub" id="dagsub"></p></div>
+        <button class="knop klein" id="plan-knop">＋ Blok plannen</button>
+      </div>
+      <div class="rooster" id="rooster"></div>
+    </div>
+
+    <div class="kaart" id="mijn"></div>
+  </main>
+</div>
+
+<!-- Blok plannen: meerdere uren en/of herhalen in één keer -->
+<dialog id="plan">
+  <form method="dialog" class="kaart" id="plan-form">
+    <div class="kaart-body">
+      <h2>Blok plannen</h2>
+      <p class="sub" id="plan-sub"></p>
+      <label>Plek
+        <select id="p-plek"></select></label>
+      <div class="formulier">
+        <label>Van <select id="p-van"></select></label>
+        <label>Tot <select id="p-tot"></select></label>
+      </div>
+      <label>Op welke dagen</label>
+      <div class="weekdagen" id="p-dagen" role="group" aria-label="Weekdagen"></div>
+      <label>Hoeveel weken
+        <input id="p-weken" type="number" min="1" max="26" value="1" inputmode="numeric"></label>
+      <p class="sub" id="p-samen"></p>
+      <div class="knop-paar">
+        <button class="knop" value="annuleer" formnovalidate>Annuleer</button>
+        <button class="knop primair" value="ok">Inplannen</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<!-- Agenda-koppeling -->
+<dialog id="agenda">
+  <div class="kaart">
+    <div class="kaart-body">
+      <h2>Jouw agenda-link</h2>
+      <p class="sub">Hiermee verschijnen jouw reserveringen vanzelf als aparte agenda op je telefoon of laptop. Aaneengesloten uren op dezelfde plek worden één afspraak. Je stelt dit één keer in.</p>
+      <div id="agenda-geen" class="sub" hidden><p><strong>Nog niet beschikbaar.</strong> De agenda-link werkt pas als de app aan de spreadsheet hangt (BACKEND_URL in index.html).</p></div>
+      <div id="agenda-wel">
+        <div class="linkrij">
+          <div class="linkveld" id="link-veld"></div>
+          <button class="knop klein" id="kopieer">Kopieer</button>
+        </div>
+        <p class="sub">Op een Mac of iPhone? <a href="#" id="webcal-link">Abonneer direct</a>, dan opent Agenda vanzelf.</p>
+      </div>
+    </div>
+    <details class="uitleg">
+      <summary>Google Agenda</summary>
+      <ol>
+        <li>Ga op een <strong>computer</strong> naar calendar.google.com</li>
+        <li>Klik links bij <strong>Andere agenda's</strong> op de <strong>+</strong></li>
+        <li>Kies <strong>Via URL</strong>, plak de link en klik <strong>Agenda toevoegen</strong></li>
+      </ol>
+      <p class="sub">De Google Agenda-app op je telefoon kan dit niet. Doe het één keer op een computer; daarna staat hij ook op je telefoon.</p>
+    </details>
+    <details class="uitleg">
+      <summary>Apple Agenda — Mac</summary>
+      <ol>
+        <li>Open <strong>Agenda</strong> → menubalk <strong>Archief → Nieuw agenda-abonnement</strong></li>
+        <li>Plak de link en klik <strong>Abonneer</strong></li>
+        <li>Zet <strong>Locatie</strong> op <strong>iCloud</strong>, dan staat hij ook op je iPhone</li>
+      </ol>
+      <p class="sub">Bij <em>Ververs</em> kies je hoe vaak hij kijkt; elke 5 minuten is het snelst.</p>
+    </details>
+    <details class="uitleg">
+      <summary>Apple Agenda — iPhone of iPad</summary>
+      <ol>
+        <li><strong>Instellingen → Apps → Agenda → Agenda-accounts</strong></li>
+        <li><strong>Account toevoegen → Overig → Voeg geabonneerde agenda toe</strong></li>
+        <li>Plak de link bij <strong>Server</strong> → <strong>Volgende</strong> → <strong>Bewaar</strong></li>
+      </ol>
+    </details>
+    <details class="uitleg">
+      <summary>Outlook</summary>
+      <ol>
+        <li>Open je agenda op outlook.com en klik <strong>Agenda toevoegen</strong></li>
+        <li>Kies <strong>Abonneren via internet</strong></li>
+        <li>Plak de link, geef hem een naam en klik <strong>Importeren</strong></li>
+      </ol>
+    </details>
+    <details class="uitleg">
+      <summary>Goed om te weten</summary>
+      <p class="sub">Dit is een abonnement, geen live koppeling. Apple haalt elke 5 minuten tot een uur op, Google maar eens per 8 tot 24 uur. Een nieuwe reservering staat dus niet meteen in je agenda; hier zie je hem wel direct. Wat je annuleert, verdwijnt bij de volgende keer ophalen weer.</p>
+    </details>
+    <div class="kaart-body"><button class="knop primair" id="agenda-sluit">Sluiten</button></div>
+  </div>
+</dialog>
+
+<script>
+// Vul hier de /exec-URL van je Apps Script web-app in (zie README, stap 1).
+// Leeg: de app bewaart alles alleen in deze browser, handig om uit te proberen.
+const BACKEND_URL = '';
+
+const START_UUR = 7;    // eerste blok 07:00–08:00
+const EIND_UUR = 20;    // laatste blok 19:00–20:00
+const PLEKKEN = [
+  { id: 'A', naam: 'Werkplek A', kop: 'A',       ruimte: '1 persoon', exclusief: true },
+  { id: 'B', naam: 'Werkplek B', kop: 'B',       ruimte: '1 persoon', exclusief: true },
+  { id: 'K', naam: 'Kantine',    kop: 'Kantine', ruimte: 'onbeperkt', exclusief: false },
+];
+const KEY = 'werkplek';
+
+let cfg = {};
+let res = [];                     // [{datum: 'yyyy-mm-dd', uur: 9, plek: 'A', naam}]
+let gekozen;                      // de dag die in het rooster staat
+let bezig = 0;                    // opslagverzoeken onderweg
+let wachtrij = Promise.resolve(); // verzoeken gaan één voor één naar de spreadsheet
+
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2, '0');
+const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const ddate = s => new Date(s + 'T12:00:00');
+const plusDagen = (s, n) => { const d = ddate(s); d.setDate(d.getDate() + n); return dstr(d); };
+const vandaag = () => dstr(new Date());
+const maandag = s => plusDagen(s, -((ddate(s).getDay() + 6) % 7));
+const uurTekst = h => `${pad(h)}:00`;
+const plekVan = id => PLEKKEN.find(p => p.id === id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Hoofdletters maken niet uit: "bart" en "Bart" zijn dezelfde persoon.
+const zelfde = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+const netjes = n => { n = String(n).trim(); return n.charAt(0).toUpperCase() + n.slice(1); };
+const ik = r => zelfde(r.naam, cfg.gebruiker);
+const op = (datum, uur) => res.filter(r => r.datum === datum && r.uur === uur);
+/** Het lopende uur telt nog mee; alles daarvoor is voorbij. */
+const voorbij = (datum, uur) => datum < vandaag() || (datum === vandaag() && uur < new Date().getHours());
+const datumKort = s => ddate(s).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
+
+const config = {
+  lees() { try { return JSON.parse(localStorage.getItem(KEY + ':config') || '{}'); } catch { return {}; } },
+  schrijf(c) { try { localStorage.setItem(KEY + ':config', JSON.stringify(c)); } catch {} },
+};
+
+// ---------- regels ----------
+
+/**
+ * Dezelfde regels als de backend: eerst verwijderen (alleen je eigen blokken),
+ * dan toevoegen. A en B één persoon per uur, kantine onbeperkt, en jij zit per
+ * uur op hooguit één plek.
+ */
+function pasToe(lijst, naam, toevoegen, verwijderen) {
+  const afgewezen = [];
+  const uit = lijst.filter(r => !verwijderen.some(v =>
+    v.datum === r.datum && v.uur === r.uur && v.plek === r.plek && zelfde(r.naam, naam)));
+  for (const t of toevoegen) {
+    const daar = uit.filter(r => r.datum === t.datum && r.uur === t.uur);
+    const eigen = daar.find(r => zelfde(r.naam, naam));
+    if (eigen) {
+      if (eigen.plek !== t.plek) afgewezen.push({ ...t, reden: 'dubbel', bij: eigen.plek });
+      continue;
+    }
+    const bezet = plekVan(t.plek).exclusief && daar.find(r => r.plek === t.plek);
+    if (bezet) { afgewezen.push({ ...t, reden: 'bezet', door: bezet.naam }); continue; }
+    uit.push({ datum: t.datum, uur: t.uur, plek: t.plek, naam });
+  }
+  return { lijst: uit, afgewezen };
+}
+
+/** Aaneengesloten uren op dezelfde dag en plek, als één blok. */
+function blokken(lijst) {
+  const gesorteerd = [...lijst].sort((a, b) =>
+    a.datum.localeCompare(b.datum) || a.uur - b.uur || a.plek.localeCompare(b.plek));
+  const uit = [];
+  for (const r of gesorteerd) {
+    const vorige = uit.findLast(b => b.datum === r.datum && b.plek === r.plek);
+    if (vorige && vorige.tot === r.uur) { vorige.tot++; vorige.uren.push(r.uur); }
+    else uit.push({ datum: r.datum, plek: r.plek, van: r.uur, tot: r.uur + 1, uren: [r.uur] });
+  }
+  return uit.sort((a, b) => a.datum.localeCompare(b.datum) || a.van - b.van);
+}
+
+// ---------- opslag ----------
+
+async function backend(actie, payload = {}) {
+  if (!BACKEND_URL) return lokaal(actie, payload);
+  // Apps Script accepteert text/plain zonder CORS-preflight.
+  const r = await fetch(BACKEND_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ actie, ...payload }),
+  });
+  if (!r.ok) throw new Error(`Backend gaf ${r.status}`);
+  const j = await r.json();
+  if (j.fout) throw new Error(j.fout);
+  return j;
+}
+
+/** Zonder spreadsheet: alles in deze browser, met dezelfde regels. */
+function lokaal(actie, p) {
+  let lijst = [];
+  try { lijst = JSON.parse(localStorage.getItem(KEY + ':lokaal') || '[]'); } catch {}
+  if (actie !== 'wijzig') return { reserveringen: lijst };
+  const u = pasToe(lijst, p.naam, p.toevoegen || [], p.verwijderen || []);
+  try { localStorage.setItem(KEY + ':lokaal', JSON.stringify(u.lijst)); } catch {}
+  return { reserveringen: u.lijst, afgewezen: u.afgewezen };
+}
+
+function zetSync(tekst) { $('#sync').textContent = tekst; }
+function gesynct() {
+  const t = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+  zetSync(BACKEND_URL ? `bijgewerkt ${t}` : 'alleen in deze browser');
+}
+
+async function laad() {
+  if (bezig) return;
+  try {
+    const j = await backend('laden');
+    if (!bezig) res = j.reserveringen || [];
+    gesynct();
+  } catch (e) {
+    zetSync('offline — spreadsheet niet bereikbaar');
+  }
+  render();
+}
+
+/**
+ * Meteen in beeld, daarna naar de spreadsheet. Wat hier al niet kan, gaat niet
+ * mee; wat de spreadsheet alsnog weigert (iemand was je net voor), meldt hij terug.
+ * Geeft terug wat lokaal al werd afgewezen.
+ */
+function wijzig(toevoegen = [], verwijderen = []) {
+  const u = pasToe(res, cfg.gebruiker, toevoegen, verwijderen);
+  const doorsturen = toevoegen.filter(t => !u.afgewezen.some(a =>
+    a.datum === t.datum && a.uur === t.uur && a.plek === t.plek));
+  res = u.lijst;
+  render();
+  if (!doorsturen.length && !verwijderen.length) return u.afgewezen;
+
+  bezig++;
+  zetSync('opslaan…');
+  wachtrij = wachtrij.then(async () => {
+    let mislukt = false;
+    try {
+      const j = await backend('wijzig', { naam: cfg.gebruiker, toevoegen: doorsturen, verwijderen });
+      if (j.afgewezen?.length) meldTeLaat(j.afgewezen);
+      if (bezig === 1) res = j.reserveringen || res;
+      gesynct();
+    } catch (e) {
+      mislukt = true;
+      melding(`Opslaan mislukt: ${e.message}`);
+      zetSync('niet opgeslagen');
+    } finally {
+      bezig--;
+      if (mislukt && !bezig) await laad(); else render();
+    }
+  });
+  return u.afgewezen;
+}
+
+function meldTeLaat(afgewezen) {
+  const a = afgewezen[0];
+  if (afgewezen.length === 1 && a.reden === 'bezet') {
+    melding(`${plekVan(a.plek).naam} om ${uurTekst(a.uur)} is net geboekt door ${netjes(a.door)}.`);
+  } else {
+    melding(`${afgewezen.length} ${afgewezen.length === 1 ? 'uur' : 'uren'} niet geboekt: inmiddels bezet.`);
+  }
+}
+
+// ---------- opstarten ----------
+
+function start() {
+  cfg = config.lees();
+  if (!cfg.gebruiker) return toonAanmelden();
+  $('#aanmelden').hidden = true;
+  $('#app').hidden = false;
+  $('#wissel').textContent = netjes(cfg.gebruiker);
+  zetBalkHoogte();
+  gekozen = gekozen || vandaag();
+  render();
+  laad();
+}
+
+function toonAanmelden() {
+  $('#app').hidden = true;
+  $('#aanmelden').hidden = false;
+  $('#gebruikersnaam').value = '';
+  $('#gebruikersnaam').focus();
+}
+
+$('#aanmeld-form').onsubmit = e => {
+  e.preventDefault();
+  const naam = $('#gebruikersnaam').value.trim().replace(/\s+/g, ' ').slice(0, 30);
+  if (!naam) return;
+  config.schrijf({ ...config.lees(), gebruiker: naam });
+  start();
+};
+
+$('#wissel').onclick = () => {
+  if (!confirm(`Afmelden als ${netjes(cfg.gebruiker)}? Je reserveringen blijven gewoon staan.`)) return;
+  config.schrijf({ thema: config.lees().thema });
+  toonAanmelden();
+};
+
+/** De plekkenkop plakt onder de kopbalk; daarvoor moet hij weten hoe hoog die is. */
+function zetBalkHoogte() {
+  document.documentElement.style.setProperty('--balk-h', $('.balk').offsetHeight + 'px');
+}
+window.addEventListener('resize', zetBalkHoogte);
+
+// ---------- weergave ----------
+
+function render() {
+  if ($('#app').hidden) return;
+  rendDagen();
+  rendRooster();
+  rendMijn();
+}
+
+function rendDagen() {
+  const ma = maandag(gekozen), zo = plusDagen(ma, 6);
+  const fmt = (s, o) => ddate(s).toLocaleDateString('nl-NL', o);
+  $('#weekbereik').textContent = fmt(ma, { month: 'short' }) === fmt(zo, { month: 'short' })
+    ? `${fmt(ma, { day: 'numeric' })} – ${fmt(zo, { day: 'numeric', month: 'long' })}`
+    : `${fmt(ma, { day: 'numeric', month: 'short' })} – ${fmt(zo, { day: 'numeric', month: 'short' })}`;
+
+  const mijnDagen = new Set(res.filter(ik).map(r => r.datum));
+  $('#dagen').innerHTML = Array.from({ length: 7 }, (_, i) => {
+    const d = plusDagen(ma, i);
+    const cls = [d === gekozen && 'actief', d === vandaag() && 'vandaag', d < vandaag() && 'verleden'].filter(Boolean).join(' ');
+    return `<button class="${cls}" data-datum="${d}" aria-label="${fmt(d, { weekday: 'long', day: 'numeric', month: 'long' })}">
+      <span class="dagnaam">${fmt(d, { weekday: 'short' }).replace('.', '')}</span>
+      <strong>${ddate(d).getDate()}</strong>
+      <span class="stip${mijnDagen.has(d) ? ' aan' : ''}"></span></button>`;
+  }).join('');
+}
+
+function naamPil(r) {
+  return `<span class="naam${ik(r) ? ' ik' : ''}">${ik(r) ? 'Jij' : esc(netjes(r.naam))}</span>`;
+}
+
+function rendRooster() {
+  const titel = ddate(gekozen).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#dagtitel').textContent = titel.charAt(0).toUpperCase() + titel.slice(1);
+  const mijn = blokken(res.filter(r => r.datum === gekozen && ik(r)));
+  $('#dagsub').textContent = mijn.length
+    ? 'Jij: ' + mijn.map(b => `${plekVan(b.plek).naam} ${uurTekst(b.van)}–${uurTekst(b.tot)}`).join(', ')
+    : gekozen < vandaag() ? 'Deze dag is voorbij.' : 'Tik op een vrij blok om het te reserveren.';
+
+  const html = ['<div class="kop hoek"></div>',
+    ...PLEKKEN.map(p => `<div class="kop"><strong>${p.kop}</strong><span>${p.ruimte}</span></div>`)];
+  const nuUur = new Date().getHours();
+
+  for (let h = START_UUR; h < EIND_UUR; h++) {
+    const weg = voorbij(gekozen, h);
+    const nu = gekozen === vandaag() && h === nuUur;
+    html.push(`<div class="tijd${nu ? ' nu' : ''}${weg ? ' voorbij' : ''}">${uurTekst(h)}</div>`);
+    const hier = op(gekozen, h);
+
+    for (const p of PLEKKEN) {
+      const lijst = hier.filter(r => r.plek === p.id).sort((a, b) => ik(b) - ik(a) || a.naam.localeCompare(b.naam));
+      const mijnHier = lijst.some(ik);
+      let inhoud, titel;
+      if (p.exclusief) {
+        inhoud = lijst[0] ? naamPil(lijst[0]) : (weg ? '' : '<span class="plus">+</span>');
+        titel = lijst[0] ? (mijnHier ? 'Tik om vrij te geven' : `Bezet door ${netjes(lijst[0].naam)}`) : 'Vrij — tik om te reserveren';
+      } else {
+        const toon = lijst.slice(0, 3);
+        inhoud = toon.map(naamPil).join('')
+          + (lijst.length > 3 ? `<span class="naam meer">+${lijst.length - 3}</span>` : '')
+          + (!mijnHier && !weg ? '<span class="plus">+</span>' : '');
+        titel = (lijst.length ? lijst.map(r => netjes(r.naam)).join(', ') + ' — ' : '')
+          + (mijnHier ? 'tik om je plek vrij te geven' : 'tik om erbij te gaan zitten');
+      }
+      const bezet = p.exclusief && lijst[0] && !mijnHier;
+      html.push(`<button type="button" class="cel${bezet ? ' bezet' : ''}" data-uur="${h}" data-plek="${p.id}"
+        ${weg ? 'disabled' : ''} title="${esc(`${p.naam} ${uurTekst(h)}–${uurTekst(h + 1)}: ${titel}`)}">${inhoud}</button>`);
+    }
+  }
+  $('#rooster').innerHTML = html.join('');
+}
+
+function rendMijn() {
+  const komend = blokken(res.filter(r => ik(r) && !voorbij(r.datum, r.uur)));
+  const doel = $('#mijn');
+  if (!komend.length) {
+    doel.innerHTML = `<div class="kaart-kop"><div><h2>Jouw reserveringen</h2>
+      <p class="sub">Nog niets gepland. Tik op een vrij blok, of plan meerdere uren tegelijk.</p></div></div>`;
+    return;
+  }
+  const max = 14;
+  doel.innerHTML = `<div class="kaart-kop"><div><h2>Jouw reserveringen</h2>
+      <p class="sub">${komend.length} ${komend.length === 1 ? 'blok' : 'blokken'} gepland. Tik om naar die dag te gaan.</p></div></div>
+    <ul class="mijnlijst">${komend.slice(0, max).map((b, i) => `<li>
+      <button class="ga" data-datum="${b.datum}">
+        <span class="datum">${b.datum === vandaag() ? 'vandaag' : datumKort(b.datum)}</span>
+        <span class="wat"><strong>${plekVan(b.plek).naam}</strong>${uurTekst(b.van)}–${uurTekst(b.tot)}</span>
+      </button>
+      <button class="rij-weg" data-blok="${i}" aria-label="Annuleer ${plekVan(b.plek).naam} ${datumKort(b.datum)}" title="Annuleren">×</button>
+    </li>`).join('')}</ul>
+    ${komend.length > max ? `<p class="sub leeg">en nog ${komend.length - max} verder in de toekomst</p>` : ''}`;
+  doel._blokken = komend;
+}
+
+// ---------- interactie ----------
+
+$('#dagen').onclick = e => {
+  const b = e.target.closest('button[data-datum]');
+  if (b) { gekozen = b.dataset.datum; render(); }
+};
+$('#vorige').onclick = () => { gekozen = plusDagen(gekozen, -7); render(); };
+$('#volgende').onclick = () => { gekozen = plusDagen(gekozen, 7); render(); };
+$('#vandaag-knop').onclick = () => { gekozen = vandaag(); render(); };
+
+$('#rooster').onclick = e => {
+  const c = e.target.closest('button.cel');
+  if (!c || c.disabled) return;
+  const datum = gekozen, uur = +c.dataset.uur, plek = c.dataset.plek;
+  const p = plekVan(plek);
+  const hier = op(datum, uur);
+  const mijn = hier.find(ik);
+  const blok = { datum, uur, plek };
+
+  if (mijn?.plek === plek) {
+    wijzig([], [blok]);
+    return melding(`${p.naam} ${uurTekst(uur)} vrijgegeven.`, 2200);
+  }
+  const bezet = p.exclusief && hier.find(r => r.plek === plek);
+  if (bezet) return melding(`${p.naam} is om ${uurTekst(uur)} al bezet door ${netjes(bezet.naam)}. Alleen die kan hem vrijgeven.`);
+  if (mijn) {
+    // Je zat dit uur al ergens anders: verplaatsen in één keer.
+    wijzig([blok], [{ datum, uur, plek: mijn.plek }]);
+    return melding(`Verplaatst van ${plekVan(mijn.plek).naam} naar ${p.naam} (${uurTekst(uur)}).`, 2600);
+  }
+  wijzig([blok]);
+};
+
+$('#mijn').onclick = e => {
+  const weg = e.target.closest('.rij-weg');
+  if (weg) {
+    const b = $('#mijn')._blokken[+weg.dataset.blok];
+    const uren = b.uren.filter(h => !voorbij(b.datum, h));
+    wijzig([], uren.map(uur => ({ datum: b.datum, uur, plek: b.plek })));
+    return melding(`${plekVan(b.plek).naam} ${datumKort(b.datum)} ${uurTekst(uren[0])}–${uurTekst(b.tot)} geannuleerd.`, 2600);
+  }
+  const ga = e.target.closest('.ga');
+  if (ga) {
+    gekozen = ga.dataset.datum; render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+};
+
+// ---------- blok plannen ----------
+
+const uurOpties = (van, tot) => Array.from({ length: tot - van + 1 }, (_, i) =>
+  `<option value="${van + i}">${uurTekst(van + i)}</option>`).join('');
+$('#p-plek').innerHTML = PLEKKEN.map(p => `<option value="${p.id}">${p.naam}</option>`).join('');
+$('#p-van').innerHTML = uurOpties(START_UUR, EIND_UUR - 1);
+$('#p-tot').innerHTML = uurOpties(START_UUR + 1, EIND_UUR);
+
+$('#plan-knop').onclick = () => {
+  if (gekozen < vandaag()) gekozen = vandaag(), render();
+  const lang = ddate(gekozen).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#plan-sub').textContent = `Vanaf ${lang}`;
+  const eerste = gekozen === vandaag() ? Math.max(START_UUR, new Date().getHours()) : Math.max(START_UUR, 9);
+  const van = Math.min(eerste, EIND_UUR - 1);
+  $('#p-van').value = van;
+  $('#p-tot').value = Math.max(van + 1, Math.min(17, EIND_UUR));
+  // Standaard: alleen de gekozen dag, deze week.
+  const wd = ddate(gekozen).getDay();
+  $('#p-dagen').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.dag === wd)));
+  $('#p-weken').value = 1;
+  planSamenvatting();
+  // Anders telt Escape of een tik ernaast als de vorige "Inplannen".
+  $('#plan').returnValue = '';
+  $('#plan').showModal();
+};
+// Bolletjes in volgorde ma–zo; de waarde is getDay() (zondag = 0).
+const WEEKDAGEN = [[1, 'ma'], [2, 'di'], [3, 'wo'], [4, 'do'], [5, 'vr'], [6, 'za'], [0, 'zo']];
+$('#p-dagen').innerHTML = WEEKDAGEN.map(([d, n]) =>
+  `<button type="button" data-dag="${d}" aria-pressed="false">${n}</button>`).join('');
+$('#p-dagen').onclick = e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+  planSamenvatting();
+};
+const gekozenDagen = () => [...$('#p-dagen').querySelectorAll('[aria-pressed="true"]')].map(b => +b.dataset.dag);
+const planWeken = () => Math.max(1, Math.min(26, parseInt($('#p-weken').value, 10) || 1));
+
+/** De dagen die het plan raakt: vanaf de gekozen dag, zoveel weken vooruit. */
+function planDagen() {
+  const wd = gekozenDagen(), uit = [];
+  for (let i = 0; i < planWeken() * 7; i++) {
+    const d = plusDagen(gekozen, i);
+    if (wd.includes(ddate(d).getDay())) uit.push(d);
+  }
+  return uit;
+}
+function planSamenvatting() {
+  const n = planDagen().length;
+  const uren = Math.max(0, +$('#p-tot').value - +$('#p-van').value);
+  $('#p-samen').textContent = n
+    ? `${n} ${n === 1 ? 'dag' : 'dagen'} × ${uren} ${uren === 1 ? 'uur' : 'uren'}, t/m ${datumKort(planDagen().at(-1))}.`
+    : 'Kies minstens één dag.';
+}
+$('#p-weken').oninput = planSamenvatting;
+$('#p-van').onchange = () => { if (+$('#p-tot').value <= +$('#p-van').value) $('#p-tot').value = +$('#p-van').value + 1; planSamenvatting(); };
+$('#p-tot').onchange = () => { if (+$('#p-tot').value <= +$('#p-van').value) $('#p-van').value = +$('#p-tot').value - 1; planSamenvatting(); };
+
+$('#plan').addEventListener('close', () => {
+  if ($('#plan').returnValue !== 'ok') return;
+  const plek = $('#p-plek').value, van = +$('#p-van').value, tot = +$('#p-tot').value;
+  const dagen = planDagen();
+  if (!dagen.length) return melding('Niets ingepland: kies minstens één dag.');
+  const toevoegen = [];
+  for (const datum of dagen) for (let uur = van; uur < tot; uur++)
+    if (!voorbij(datum, uur)) toevoegen.push({ datum, uur, plek });
+
+  const voor = res.filter(ik).length;
+  const af = wijzig(toevoegen);
+  const geboekt = res.filter(ik).length - voor;
+  const bezet = af.filter(a => a.reden === 'bezet').length;
+  const dubbel = af.filter(a => a.reden === 'dubbel').length;
+  const delen = [`${geboekt} ${geboekt === 1 ? 'uur' : 'uren'} ingepland`];
+  if (bezet) delen.push(`${bezet} al bezet`);
+  if (dubbel) delen.push(`${dubbel} overgeslagen omdat je dan al ergens anders zit`);
+  melding(delen.join(', ') + '.');
+});
+$('#plan').addEventListener('click', e => { if (e.target === $('#plan')) $('#plan').close(); });
+
+// ---------- agenda ----------
+
+const agendaLink = () => `${BACKEND_URL}?actie=ical&naam=${encodeURIComponent(cfg.gebruiker.trim().toLowerCase())}`;
+
+$('#agenda-knop').onclick = () => {
+  $('#agenda-geen').hidden = !!BACKEND_URL;
+  $('#agenda-wel').hidden = !BACKEND_URL;
+  if (BACKEND_URL) {
+    const link = agendaLink();
+    $('#link-veld').textContent = link;
+    $('#link-veld').title = link;
+    $('#webcal-link').href = link.replace(/^https:/, 'webcal:');
+    $('#kopieer').textContent = 'Kopieer';
+  }
+  $('#agenda').showModal();
+};
+$('#kopieer').onclick = async () => {
+  const link = agendaLink();
+  try { await navigator.clipboard.writeText(link); }
+  catch {
+    const tmp = document.createElement('textarea');
+    tmp.value = link; document.body.append(tmp); tmp.select();
+    try { document.execCommand('copy'); } catch {}
+    tmp.remove();
+  }
+  $('#kopieer').textContent = 'Gekopieerd ✓';
+};
+$('#agenda-sluit').onclick = () => $('#agenda').close();
+$('#agenda').addEventListener('click', e => { if (e.target === $('#agenda')) $('#agenda').close(); });
+
+// ---------- thema ----------
+
+const THEMAS = ['auto', 'licht', 'donker'];
+function pasThemaToe(thema) {
+  if (thema === 'auto') document.documentElement.removeAttribute('data-thema');
+  else document.documentElement.setAttribute('data-thema', thema);
+  const knop = $('#thema-knop');
+  knop.textContent = { auto: '◐', licht: '☀', donker: '☾' }[thema];
+  knop.title = { auto: 'Thema: volgt je systeem', licht: 'Thema: licht', donker: 'Thema: donker' }[thema];
+}
+$('#thema-knop').onclick = () => {
+  const nu = config.lees();
+  const volgende = THEMAS[(THEMAS.indexOf(nu.thema ?? 'auto') + 1) % THEMAS.length];
+  config.schrijf({ ...nu, thema: volgende });
+  pasThemaToe(volgende);
+};
+
+// ---------- melding ----------
+
+let meldingTimer;
+function melding(tekst, ms = 5000) {
+  const m = $('#melding');
+  m.textContent = tekst;
+  m.hidden = false;
+  clearTimeout(meldingTimer);
+  meldingTimer = setTimeout(() => (m.hidden = true), ms);
+}
+
+// ---------- verversen ----------
+
+// Elke minuut: anderen hun boekingen ophalen en verstreken uren grijs maken.
+setInterval(() => { if (document.visibilityState === 'visible' && cfg.gebruiker) laad(); }, 60000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && cfg.gebruiker && !$('#app').hidden) laad();
+});
+
+pasThemaToe(config.lees().thema ?? 'auto');
+start();
+</script>
+</body>
+</html>
