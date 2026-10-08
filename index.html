@@ -9,8 +9,7 @@
 <meta name="theme-color" content="#0c0d0f" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💻</text></svg>">
 <style>
-/* Hetzelfde monochrome kaartontwerp als Gymtracker. Alle kleur zit in tokens;
-   licht en donker zijn dezelfde vormen met omgekeerde grijstinten. */
+
 :root {
   --bg: #efeff1;
   --kaart: #ffffff;
@@ -395,9 +394,8 @@ dialog .kaart { margin: 0; overflow: auto; max-height: calc(100dvh - 2rem); }
 </dialog>
 
 <script>
-// Vul hier de /exec-URL van je Apps Script web-app in (zie README, stap 1).
-// Leeg: de app bewaart alles alleen in deze browser, handig om uit te proberen.
-const BACKEND_URL = '';
+   
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzcmc9PatOlCwyRgBdv6417yDDV7tQji8ocj7htVCUg1ezmg_rCQWCYMcOguz8-ZmNT/exec';
 
 const START_UUR = 7;    // eerste blok 07:00–08:00
 const EIND_UUR = 20;    // laatste blok 19:00–20:00
